@@ -1,0 +1,572 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  SELLER
+  CONTRACTOR
+  ARCHITECT
+  COMPANY
+  ADMIN
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  CLICK
+  PAYME
+  UZUM
+}
+
+enum PaymentStatus {
+  INITIATED
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        UserRole         @unique
+  description String
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+}
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  code        String           @unique
+  description String
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model User {
+  id                Int                @id @default(autoincrement())
+  email             String             @unique
+  passwordHash      String
+  fullName          String
+  phone             String?
+  role              UserRole           @default(CUSTOMER)
+  region            String
+  avatarUrl         String?
+  preferredLang     String             @default("uz")
+  verified          Boolean            @default(false)
+  isActive          Boolean            @default(true)
+  deletedAt         DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  profile           UserProfile?
+  addresses         Address[]
+  companies         Company[]
+  products          Product[]
+  services          Service[]
+  contractorProfile ContractorProfile?
+  architectProfile  ArchitectProfile?
+  portfolios        Portfolio[]
+  ownedProjects     Project[]
+  projectMembers    ProjectMember[]
+  assignedTasks     ProjectTask[]
+  estimates         Estimate[]
+  customerOrders    Order[]            @relation("CustomerOrders")
+  sellerOrders      Order[]            @relation("SellerOrders")
+  payments          Payment[]
+  reviews           Review[]
+  favorites         Favorite[]
+  notifications     Notification[]
+  subscriptions     Subscription[]
+  complaints        Complaint[]
+
+  @@index([role, region])
+}
+
+model UserProfile {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName     String?
+  taxId           String?
+  address         String?
+  website         String?
+  experienceYears Int      @default(0)
+  updatedAt       DateTime @updatedAt
+}
+
+model Address {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label      String
+  region     String
+  district   String
+  street     String
+  postalCode String?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Company {
+  id                Int               @id @default(autoincrement())
+  ownerId           Int
+  owner             User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name              String
+  slug              String            @unique
+  descriptionUz     String
+  descriptionRu     String
+  descriptionEn     String
+  region            String
+  address           String
+  phone             String
+  email             String
+  licenseNumber     String
+  foundedYear       Int
+  completedProjects Int               @default(0)
+  rating            Decimal           @default(4.8) @db.Decimal(3, 2)
+  verified          Boolean           @default(false)
+  deletedAt         DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  employees         CompanyEmployee[]
+  projects          Project[]
+}
+
+model CompanyEmployee {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fullName  String
+  position  String
+  phone     String?
+  email     String?
+  specialty String
+  salaryUzs Decimal  @default(0) @db.Decimal(16, 2)
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+}
+
+model ProductCategory {
+  id       Int       @id @default(autoincrement())
+  slug     String    @unique
+  nameUz   String
+  nameRu   String
+  nameEn   String
+  products Product[]
+}
+
+model Product {
+  id               Int             @id @default(autoincrement())
+  sellerId         Int
+  seller           User            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  categoryId       Int
+  category         ProductCategory @relation(fields: [categoryId], references: [id])
+  sku              String
+  nameUz           String
+  nameRu           String
+  nameEn           String
+  descriptionUz    String
+  descriptionRu    String
+  descriptionEn    String
+  priceUzs         Decimal         @db.Decimal(16, 2)
+  unit             String
+  region           String
+  deliveryOptions  String
+  moderationStatus String          @default("APPROVED")
+  deletedAt        DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  images           ProductImage[]
+  inventory        Inventory?
+  orderItems       OrderItem[]
+
+  @@index([categoryId, region])
+}
+
+model ProductImage {
+  id        Int     @id @default(autoincrement())
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  imageUrl  String
+  isPrimary Boolean @default(false)
+}
+
+model Inventory {
+  id                Int      @id @default(autoincrement())
+  productId         Int      @unique
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity          Int      @default(0)
+  reservedQuantity  Int      @default(0)
+  lowStockThreshold Int      @default(20)
+  updatedAt         DateTime @updatedAt
+}
+
+model ServiceCategory {
+  id       Int       @id @default(autoincrement())
+  slug     String    @unique
+  nameUz   String
+  nameRu   String
+  nameEn   String
+  services Service[]
+}
+
+model Service {
+  id           Int             @id @default(autoincrement())
+  providerId   Int
+  provider     User            @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  categoryId   Int
+  category     ServiceCategory @relation(fields: [categoryId], references: [id])
+  titleUz      String
+  titleRu      String
+  titleEn      String
+  priceFromUzs Decimal         @db.Decimal(16, 2)
+  priceUnit    String
+  region       String
+  deletedAt    DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model ContractorProfile {
+  id              Int     @id @default(autoincrement())
+  userId          Int     @unique
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline        String
+  specialty       String
+  experienceYears Int
+  teamSize        Int
+  region          String
+  hourlyRateUzs   Decimal @db.Decimal(16, 2)
+  verified        Boolean @default(false)
+}
+
+model ArchitectProfile {
+  id              Int     @id @default(autoincrement())
+  userId          Int     @unique
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studioName      String
+  specialty       String
+  experienceYears Int
+  region          String
+  licenseCode     String
+  pricePerSqmUzs  Decimal @db.Decimal(16, 2)
+  verified        Boolean @default(false)
+}
+
+model Portfolio {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  category       String
+  region         String
+  areaSqm        Int
+  completionYear Int
+  imageUrl       String
+  description    String
+  createdAt      DateTime @default(now())
+}
+
+model Project {
+  id                 Int               @id @default(autoincrement())
+  ownerId            Int
+  owner              User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  companyId          Int?
+  company            Company?          @relation(fields: [companyId], references: [id])
+  name               String
+  description        String
+  address            String
+  region             String
+  constructionType   String
+  buildingAreaSqm    Decimal           @db.Decimal(10, 2)
+  floors             Int
+  estimatedBudgetUzs Decimal           @db.Decimal(18, 2)
+  spentUzs           Decimal           @default(0) @db.Decimal(18, 2)
+  progressPercent    Int               @default(0)
+  startDate          DateTime
+  expectedEndDate    DateTime
+  deletedAt          DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  members            ProjectMember[]
+  tasks              ProjectTask[]
+  progressUpdates    ProjectProgress[]
+  expenses           ProjectExpense[]
+  estimates          Estimate[]
+  contracts          Contract[]
+  documents          Document[]
+}
+
+model ProjectMember {
+  id         Int      @id @default(autoincrement())
+  projectId  Int
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memberRole String
+  assignedAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+}
+
+model ProjectTask {
+  id          Int        @id @default(autoincrement())
+  projectId   Int
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assigneeId  Int?
+  assignee    User?      @relation(fields: [assigneeId], references: [id])
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    String     @default("MEDIUM")
+  deadline    DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model ProjectProgress {
+  id              Int      @id @default(autoincrement())
+  projectId       Int
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorId        Int
+  title           String
+  notes           String
+  percentComplete Int
+  photoUrl        String?
+  createdAt       DateTime @default(now())
+}
+
+model ProjectExpense {
+  id          Int      @id @default(autoincrement())
+  projectId   Int
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  recordedBy  Int
+  category    String
+  title       String
+  amountUzs   Decimal  @db.Decimal(16, 2)
+  expenseDate DateTime
+  vendorName  String?
+  createdAt   DateTime @default(now())
+}
+
+model Estimate {
+  id                Int            @id @default(autoincrement())
+  userId            Int
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId         Int?
+  project           Project?       @relation(fields: [projectId], references: [id])
+  title             String
+  buildingAreaSqm   Decimal        @db.Decimal(10, 2)
+  floors            Int
+  constructionType  String
+  foundationType    String
+  wallMaterial      String
+  roofType          String
+  finishingType     String
+  region            String
+  totalEstimatedUzs Decimal        @db.Decimal(18, 2)
+  items             EstimateItem[]
+  createdAt         DateTime       @default(now())
+}
+
+model EstimateItem {
+  id           Int      @id @default(autoincrement())
+  estimateId   Int
+  estimate     Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  itemKey      String
+  name         String
+  quantity     Decimal  @db.Decimal(12, 2)
+  unit         String
+  unitPriceUzs Decimal  @db.Decimal(16, 2)
+  subtotalUzs  Decimal  @db.Decimal(18, 2)
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  orderNumber     String      @unique
+  customerId      Int
+  customer        User        @relation("CustomerOrders", fields: [customerId], references: [id])
+  sellerId        Int
+  seller          User        @relation("SellerOrders", fields: [sellerId], references: [id])
+  status          OrderStatus @default(PENDING)
+  totalUzs        Decimal     @db.Decimal(18, 2)
+  deliveryAddress String
+  region          String
+  items           OrderItem[]
+  payments        Payment[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  id           Int     @id @default(autoincrement())
+  orderId      Int
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    Int
+  product      Product @relation(fields: [productId], references: [id])
+  productName  String
+  quantity     Int
+  unitPriceUzs Decimal @db.Decimal(16, 2)
+  subtotalUzs  Decimal @db.Decimal(18, 2)
+}
+
+model Payment {
+  id           Int             @id @default(autoincrement())
+  paymentRef   String          @unique
+  userId       Int
+  user         User            @relation(fields: [userId], references: [id])
+  orderId      Int?
+  order        Order?          @relation(fields: [orderId], references: [id])
+  provider     PaymentProvider
+  amountUzs    Decimal         @db.Decimal(18, 2)
+  status       PaymentStatus   @default(INITIATED)
+  sandboxMode  Boolean         @default(true)
+  externalTxId String?
+  transactions Transaction[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model Transaction {
+  id                Int      @id @default(autoincrement())
+  paymentId         Int
+  payment           Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  eventType         String
+  amountUzs         Decimal  @db.Decimal(18, 2)
+  status            String
+  signatureVerified Boolean  @default(true)
+  createdAt         DateTime @default(now())
+}
+
+model Review {
+  id         Int      @id @default(autoincrement())
+  authorId   Int
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  targetType String
+  targetId   Int
+  rating     Int
+  comment    String
+  createdAt  DateTime @default(now())
+}
+
+model Favorite {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetType String
+  targetId   Int
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, targetType, targetId])
+}
+
+model Conversation {
+  id             Int       @id @default(autoincrement())
+  participantOne Int
+  participantTwo Int
+  subject        String?
+  lastMessageAt  DateTime  @default(now())
+  messages       Message[]
+
+  @@unique([participantOne, participantTwo])
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  conversationId Int
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       Int
+  body           String
+  attachmentUrl  String?
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planCode  String
+  priceUzs  Decimal  @db.Decimal(16, 2)
+  status    String   @default("ACTIVE")
+  startsAt  DateTime @default(now())
+  endsAt    DateTime
+}
+
+model Contract {
+  id             Int      @id @default(autoincrement())
+  contractNumber String   @unique
+  projectId      Int
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  clientId       Int
+  contractorId   Int
+  title          String
+  amountUzs      Decimal  @db.Decimal(18, 2)
+  status         String   @default("ACTIVE")
+  terms          String
+  signedAt       DateTime @default(now())
+}
+
+model Document {
+  id         Int      @id @default(autoincrement())
+  projectId  Int
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy Int
+  title      String
+  docType    String
+  fileUrl    String
+  createdAt  DateTime @default(now())
+}
+
+model Complaint {
+  id             Int      @id @default(autoincrement())
+  reporterId     Int
+  reporter       User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType     String
+  targetId       Int
+  reason         String
+  details        String
+  status         String   @default("OPEN")
+  resolutionNote String?
+  createdAt      DateTime @default(now())
+}

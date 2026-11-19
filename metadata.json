@@ -1,0 +1,6 @@
+{
+  "name": "QurilishHub",
+  "description": "O'zbekiston qurilish ekotizimi: qurilish materiallari bozori, pudratchilar, arxitektorlar, loyihalar boshqaruvi va aqlli smeta kalkulyatori.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
